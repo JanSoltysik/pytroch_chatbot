@@ -302,3 +302,73 @@ class Decoder(nn.Module):
             self.concat(concat_input)
         )
         return F.softmax(self.out(concat_out), dim=1), hidden
+
+
+class GreedySearchDecoder(nn.Module):
+    """
+    Class implementing greedy decoding.
+    Word is chosen from decoder_output with the highest softmax value.
+    Decoding is optimal on a single-step level.
+
+    Attributes
+    ----------
+    encoder: Encoder
+        Trained encoder model.
+    decoder: Decoder
+        Trained decoder model.
+    """
+    def __init__(self, encoder: Encoder, decoder: Decoder) -> None:
+        """
+        Parameters
+        ----------
+        encoder: Encoder
+            Implemented encoder model.
+        decoder: Decoder
+            Implemented decoder model.
+        """
+        self.encoder: Encoder = encoder
+        self.decoder: Decoder = decoder
+
+    def forward(self, input_seq: torch.Tensor,
+                input_length: torch.Tensor,
+                max_length: int,
+                sos_token: int,
+                device: torch.device) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Implementation of forward pass.
+
+        Parameters
+        ----------
+        input_seq: torch.Tensor
+            Tensor of input sequences.
+        input_length: torch.Tensor
+            Lengths of sequences.
+        max_length: int
+            Max sentence length.
+        sos_token: int
+            Start of the sentence token.
+        device: torch.device
+            Device on which calculation will be performed.
+        Returns
+        -------
+        Tuple[torch.Tensor, torch.Tensor]
+            Tuple of torch tensor which contains all tokens and scores
+            returned by decoder.
+        """
+        encoder_out, encoder_hidden = self.encoder(input_seq, input_length)
+        decoder_hidden = encoder_hidden[:self.decoder.num_layers]
+        decoder_in: torch.Tensor =\
+            sos_token * torch.ones(1, 1, device=device, dtype=torch.long)
+        all_tokens: torch.Tensor =\
+            torch.zeros([0], device=device, dtype=torch.long)
+        all_scores: torch.Tensor =\
+            torch.zeros([0], device=device)
+
+        for _ in range(max_length):
+            decoder_out, decoder_hidden =\
+                self.decoder(decoder_in, decoder_hidden, encoder_out)
+            decoder_scores, decoder_in = torch.max(decoder_out, dim=1)
+            all_tokens = torch.cat((all_tokens, decoder_in), dim=0)
+            all_scores = torch.cat((all_scores, decoder_scores), dim=0)
+            decoder_in = torch.unsqueeze(decoder_in, 0)
+        return all_tokens, all_scores

@@ -1,17 +1,17 @@
 """
 File implementing training loop of a defined architecture.
 """
+import os
 import random
 import logging
 from typing import List
 
 import yaml
-import numpy as np
 import torch
 import torch.nn as nn
 
 import models
-#import test as models
+from utils.logger import logging_setup
 from utils.loader import Loader
 from utils.loss_fn import mask_nll_loss
 
@@ -152,7 +152,8 @@ def train_step(input_var: torch.LongTensor,
 
 
 def train(vocabulary: 'Vocabulary',
-          config: dict) -> None:
+          config: dict,
+          continue_training: bool) -> None:
     """
     Function implementing training loop.
 
@@ -162,6 +163,8 @@ def train(vocabulary: 'Vocabulary',
         Vocabulary instance providing data for training.
     config: dict
         Dictionary containing parameters of a training loop.
+    continue_training: bool
+        Continue training on last saved checkpoint if saved to True.
     """
     device: torch.device = torch.device('cuda' if torch.cuda.is_available()
                                         else 'cpu')
@@ -187,19 +190,33 @@ def train(vocabulary: 'Vocabulary',
     decoder_opt: torch.optim.Optimizer = \
         torch.optim.Adam(decoder.parameters(),
                          lr=config["training"]["decoder_learning_rate"])
+
+    start_epoch: int = 1
+    if continue_training:
+        checkpoint: dict = torch.load(
+            os.path.join(config["data"]["save_dir"], "model.tar")
+        )
+        encoder.load_state_dict(checkpoint["encoder"])
+        decoder.load_state_dict(checkpoint["decoder"])
+        encoder_opt.load_state_dict(checkpoint["encoder_opt"])
+        decoder_opt.load_state_dict(checkpoint["decoder_opt"])
+        vocabulary.__dict__ = checkpoint["vocabulary"]
+        start_epoch = checkpoint["epoch"]
+
     encoder_opt = configure_device_for_optimizer(encoder_opt, device)
     decoder_opt = configure_device_for_optimizer(decoder_opt, device)
 
     training_batches: list = [
        vocabulary.batch_to_train_data(
            [random.choice(vocabulary.pairs)
-            for _ in range(config["training"]["batch_size"])])
+            for _ in range(config["training"]["batch_size"] + 1 - start_epoch)])
        for _ in range(config["training"]["epochs"])
     ]
-    print("Training initialized.")
+
+    logging.info("Training initialized.")
 
     total_loss: float = 0.0
-    for epoch, training_batch in enumerate(training_batches, start=1):
+    for epoch, training_batch in enumerate(training_batches, start=start_epoch):
         input_var, lengths, target_var, mask, max_target_len = training_batch
         loss: float = train_step(
             input_var=input_var,
@@ -220,11 +237,20 @@ def train(vocabulary: 'Vocabulary',
         total_loss += loss
         if epoch % config["training"]["log_freq"] == 0:
             average_loss: float = total_loss / config["training"]["log_freq"]
-            print(f"Epoch: {epoch:2}| Average loss: {average_loss:.3f}")
+            logging.info(f"Epoch: {epoch:5}| Average loss: {average_loss:.3f}")
             total_loss = 0.0
 
         if epoch % config["training"]["save_freq"] == 0:
-            pass
+            torch.save({
+                "epoch": epoch,
+                "encoder": encoder.state_dict(),
+                "decoder": decoder.state_dict(),
+                "encoder_opt": encoder_opt.state_dict(),
+                "decoder_opt": decoder_opt.state_dict(),
+                "embedding": embedding.state_dict(),
+                "loss": loss,
+                "vocabulary": vocabulary.__dict__,
+            }, os.path.join(config["data"]["save_dir"], "model.tar"))
 
 
 if __name__ == "__main__":
@@ -237,4 +263,7 @@ if __name__ == "__main__":
     loader: Loader = Loader()
     loader.format_movie_lines()
     vocabulary: 'Vocabulary' = loader.load_prepared_data()
-    train(vocabulary, config)
+
+    continue_training: bool = os.path.exists(config["data"]["save_dir"])
+    logging_setup(config["data"]["save_dir"])
+    train(vocabulary, config, continue_training)
