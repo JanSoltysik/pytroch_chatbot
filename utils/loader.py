@@ -220,8 +220,7 @@ if __name__ == "__main__":
         try:
             config = yaml.safe_load(f)
         except yaml.YAMLError as e:
-            rint(f"Error during config load: {str(e)}")
-
+            print(f"Error during config load: {str(e)}")
     loader = Loader(config)
     # file = loader.format_movie_lines()
 
