@@ -13,6 +13,7 @@ vocabulary:
   sos_token: 1
   eos_token: 2
   max_length: 10
+  min_count_to_trim: 3
 
 training:
   epochs: 4000
@@ -27,7 +28,7 @@ training:
   decoder_gru_layers: 2
   dropout_ratio: 0.1
   log_freq: 1
-  save_freq: 500
+  save_freq: 100
 
 
 

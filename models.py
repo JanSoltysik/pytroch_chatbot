@@ -326,6 +326,7 @@ class GreedySearchDecoder(nn.Module):
         decoder: Decoder
             Implemented decoder model.
         """
+        super().__init__()
         self.encoder: Encoder = encoder
         self.decoder: Decoder = decoder
 

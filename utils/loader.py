@@ -10,8 +10,9 @@ import shutil
 import codecs
 import zipfile
 import random
+
 import urllib.request
-from typing import List, Tuple
+from typing import List
 
 import numpy as np
 
@@ -20,61 +21,93 @@ from utils.vocabulary import Pairs, Vocabulary
 
 
 class Loader:
-    url: str = "http://www.cs.cornell.edu/~cristian/data/cornell_movie_dialogs_corpus.zip"
-    data_name: str = "cornell_movie_dialogs_corpus.zip"
-    corpus_name: str = "cornell movie-dialogs corpus"
-    lines_file: str = "movie_lines.txt"
-    conversations_file: str = "movie_conversations.txt"
-    formated_file: str = "formatted_movie_lines.txt"
-    movie_lines_fields: List[str] = ["lineID", "characterID", "movieID", "character", "text"]
-    movie_conversation_fields: List[str] = ["character1ID", "character2ID", "movieID", "utteranceIDs"]
+    """
+    Class which downloads and reorganize
+    corpus to format which can loaded into a
+    vocabulary class.
 
-    def __init__(self, *,
-                 data_dir: str = "data",
-                 save_dir: str = "save") -> None:
-        self.data_dir: str = data_dir
-        self.save_dir: str = save_dir
+    Attributes
+    ----------
+    config: dict
+        Contains configuration of a class.
+    data_dir: str
+        Directory where corpus will be stored.
+    movie_lines_fields: List[str]
+        List of fields used in a movie lines file.
+    movie_conversation_fields: List[str]
+        List of fields used in a move converstions file.
+    """
+    def __init__(self, config: dict) -> None:
+        """
+        Parameters
+        ----------
+        config: dict
+            Dict with a configuration of a class.
+        """
+        self.config: dict = config
+        self.data_dir: str = config["data"]["data_dir"]
+        self.movie_lines_fields: List[str] =\
+            ["lineID", "characterID", "movieID", "character", "text"]
+        self.movie_conversation_fields: List[str] =\
+            ["character1ID", "character2ID", "movieID", "utteranceIDs"]
 
-        if not os.path.exists(os.path.join(data_dir, Loader.data_name)):
+        if not os.path.exists(os.path.join(self.data_dir, self.config["data"]["archive_name"])):
             self.download_corpus()
 
     def download_corpus(self) -> None:
         """
         Download compressed corpus and extracts it.
         """
-        archive: str = os.path.join(self.data_dir, Loader.data_name)
+        archive: str = os.path.join(self.data_dir, self.config["data"]["archive_name"])
 
         os.makedirs(self.data_dir, exist_ok=True)
-        urllib.request.urlretrieve(Loader.url, archive)
+        urllib.request.urlretrieve(self.config["data"]["url"], archive)
 
         with zipfile.ZipFile(archive) as zip_file:
             zip_file.extractall(self.data_dir)
 
-        # check if extracted dir ok
-        extracted_dir: str = os.path.join(self.data_dir, Loader.corpus_name)
+        extracted_dir: str = os.path.join(self.data_dir, self.config["data"]["corpus_name"])
         for file in glob.glob(os.path.join(extracted_dir, "*")):
             shutil.move(file, self.data_dir)
         shutil.rmtree(extracted_dir)
 
     def format_movie_lines(self) -> str:
-        data_file: str = os.path.join(self.data_dir, Loader.formated_file)
-        delimiter: str = str(codecs.decode("\t", "unicode_escape"))
+        """
+        Format downloaded corpus in order
+        to easily load it into a vocabulary object.
 
-        lines: dict = Loader.split_movie_lines(
-            os.path.join(self.data_dir, Loader.lines_file))
-        conversations: List[dict] = Loader.group_into_conversations(
-            os.path.join(self.data_dir, Loader.conversations_file),
-            lines)
+        Returns
+        -------
+        str
+            Name of created file.
+        """
+        data_file: str = os.path.join(self.data_dir, self.config["data"]["formated_file"])
+        if not os.path.exists(data_file):
+            delimiter: str = str(codecs.decode("\t", "unicode_escape"))
 
-        with open(data_file, "w", encoding="utf-8") as f:
-            writer: csv.writer = csv.writer(f, delimiter=delimiter, lineterminator="\n")
-            for pair in Loader.extract_sentence_pairs(conversations):
-                writer.writerow(pair)
+            lines: dict = self.split_movie_lines(
+                os.path.join(self.data_dir, self.config["data"]["lines_file"]))
+            conversations: List[dict] = self.group_into_conversations(
+                os.path.join(self.data_dir, self.config["data"]["conversations_file"]),
+                lines)
+
+            with open(data_file, "w", encoding="utf-8") as f:
+                writer: csv.writer = csv.writer(f, delimiter=delimiter, lineterminator="\n")
+                for pair in Loader.extract_sentence_pairs(conversations):
+                    writer.writerow(pair)
 
         return data_file
 
     def load_prepared_data(self) -> Vocabulary:
-        with open(os.path.join(self.data_dir, Loader.formated_file),
+        """
+        Load formated corpus into a vocabulary object.
+
+        Returns
+        -------
+        Vocabulary
+            Vocabulary initialized with formated corpus.
+        """
+        with open(os.path.join(self.data_dir, self.config["data"]["formated_file"]),
                   encoding="utf-8") as f:
             lines: List[str] = f.read().strip().split('\n')
 
@@ -82,11 +115,10 @@ class Loader:
             [preprocessing.basic_preprocessing(s) for s in line.split('\t')]
             for line in lines
         ]
-        vocabulary: Vocabulary = Vocabulary(Loader.corpus_name, pairs)
+        vocabulary: Vocabulary = Vocabulary(pairs, self.config)
         return vocabulary
 
-    @staticmethod
-    def split_movie_lines(file_name: str) -> dict:
+    def split_movie_lines(self, file_name: str) -> dict:
         """
         Splits lines into a dictionary of fields.
 
@@ -105,20 +137,33 @@ class Loader:
                 values: List[str] = line.split(" +++$+++ ")
                 line_obj: dict = {
                     field: values[i]
-                    for i, field in enumerate(Loader.movie_lines_fields)
+                    for i, field in enumerate(self.movie_lines_fields)
                 }
                 lines[line_obj['lineID']] = line_obj
         return lines
 
-    @staticmethod
-    def group_into_conversations(file_name: str, lines: dict) -> List[dict]:
+    def group_into_conversations(self, file_name: str, lines: dict) -> List[dict]:
+        """
+        Group movie lines into a conversations.
+
+        Parameters
+        ----------
+        file_name:
+            Name of a movie conversations file.
+        lines:
+            Movie lines loaded into a dict.
+        Returns
+        -------
+        List[dict]
+            Movie lines grouped into a conversations.
+        """
         conversations: List[dict] = []
         with open(file_name, 'r', encoding='iso-8859-1') as f:
             for line in f:
                 values: List[str] = line.split(" +++$+++ ")
                 conv_obj: dict = {
                     field: values[i]
-                    for i, field in enumerate(Loader.movie_conversation_fields)
+                    for i, field in enumerate(self.movie_conversation_fields)
                 }
                 utterance_id_pattern: re.Pattern = re.compile("L[0-9]+")
                 line_ids: List[str] = utterance_id_pattern.findall(conv_obj["utteranceIDs"])
@@ -129,6 +174,17 @@ class Loader:
 
     @staticmethod
     def extract_sentence_pairs(conversations: List[dict]) -> Pairs:
+        """
+        Construct list of pair of sentences from a conversations.
+
+        Parameters
+        ----------
+            Conversations to be reorganized into `Pairs`.
+        Returns
+        -------
+        Pairs
+            List of sentences pairs.
+        """
         pairs: Pairs = []
         for conversation in conversations:
             for inputs, targets in zip(conversation["lines"], conversation["lines"][1:]):
@@ -140,6 +196,18 @@ class Loader:
 
     @staticmethod
     def get_random_lines(file_name: str) -> str:
+        """
+        Return random lines from a file.
+
+        Parameters
+        ----------
+        file_name: str
+            Name of the file.
+        Returns
+        -------
+        str
+            Random lines joined into a str.
+        """
         with open(file_name, "rb") as f:
             lines: List[str] = f.readlines()
 
@@ -147,19 +215,18 @@ class Loader:
 
 
 if __name__ == "__main__":
-    loader = Loader()
-    file = loader.format_movie_lines()
-    print(Loader.get_random_lines(file))
+    import yaml
+    with open("../settings/config.yaml", encoding="utf-8") as f:
+        try:
+            config = yaml.safe_load(f)
+        except yaml.YAMLError as e:
+            rint(f"Error during config load: {str(e)}")
 
-    print('============================')
+    loader = Loader(config)
+    # file = loader.format_movie_lines()
 
     voc = loader.load_prepared_data()
     small_batch_size: int = 5
     batches = voc.batch_to_train_data(
         [random.choice(voc.pairs) for _ in range(small_batch_size)])
     inp, inp_lengths, out, mask, max_target_len = batches
-    print("Input Variable", inp)
-    print("lenghts", inp_lengths)
-    print("target_varaible", out)
-    print("mask", mask)
-    print("max_target_len:", max_target_len)

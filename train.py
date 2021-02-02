@@ -209,8 +209,8 @@ def train(vocabulary: 'Vocabulary',
     training_batches: list = [
        vocabulary.batch_to_train_data(
            [random.choice(vocabulary.pairs)
-            for _ in range(config["training"]["batch_size"] + 1 - start_epoch)])
-       for _ in range(config["training"]["epochs"])
+            for _ in range(config["training"]["batch_size"])])
+       for _ in range(config["training"]["epochs"] + 1 - start_epoch)
     ]
 
     logging.info("Training initialized.")
@@ -260,7 +260,7 @@ if __name__ == "__main__":
         except yaml.YAMLError as e:
             print(f"Error during config load: {str(e)}")
 
-    loader: Loader = Loader()
+    loader: Loader = Loader(config)
     loader.format_movie_lines()
     vocabulary: 'Vocabulary' = loader.load_prepared_data()
 

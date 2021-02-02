@@ -18,6 +18,7 @@ def evaluate(greedy_searcher: models.GreedySearchDecoder,
              vocabulary: Vocabulary,
              sentence: str,
              max_length: int,
+             sos_token: int,
              device: torch.device) -> List[str]:
     """
     Function given a sentence return a most probable next sentence.
@@ -32,6 +33,8 @@ def evaluate(greedy_searcher: models.GreedySearchDecoder,
         Sentence for which we are finding a successor.
     max_length: int
         Maximum sentence length.
+    sos_token: int
+        Start of a sentence token.
     device: torch.device
         Device on which calculations are performed.
     Returns
@@ -39,17 +42,18 @@ def evaluate(greedy_searcher: models.GreedySearchDecoder,
     List[str]
         Most probable following sentence after passed one.
     """
-    index_batch: List[int] = vocabulary.index_from_sentence(sentence)
+    index_batch: List[List[int]] = [vocabulary.index_from_sentence(sentence)]
     lengths: torch.Tensor =\
         torch.Tensor([len(index) for index in index_batch]).to(device)
     input_batch = torch.LongTensor(index_batch).transpose(0, 1).to(device)
-    tokens, scores = greedy_searcher(input_batch, lengths, max_length, device)
+    tokens, scores = greedy_searcher(input_batch, lengths, max_length, sos_token, device)
     return [vocabulary.index2word[token.item()] for token in tokens]
 
 
 def chat(greedy_searcher: models.GreedySearchDecoder,
          vocabulary: Vocabulary,
          max_length: int,
+         sos_token: int,
          device: torch.device) -> None:
     while True:
         try:
@@ -59,11 +63,13 @@ def chat(greedy_searcher: models.GreedySearchDecoder,
             out: List[str] = evaluate(
                 greedy_searcher=greedy_searcher,
                 vocabulary=vocabulary,
+                sentence=input_seq,
                 max_length=max_length,
+                sos_token=sos_token,
                 device=device
             )
             out = [word for word in out
-                    if word != "EOS" or word != "PAD"]
+                    if word != "EOS" and word != "PAD"]
             print(f"Bot: {' '.join(out)}")
         except KeyError:
             print("Word not known.")
@@ -84,13 +90,14 @@ if __name__ == "__main__":
         print(f"Train model before chatting!")
 
     vocabulary: 'Vocabulary' = Vocabulary("", [])
+    vocabulary.__dict__ = checkpoint["vocabulary"]
 
     device: torch.device =\
         torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     hidden_size: int = config['training']['hidden_size']
     dropout_ratio: float = config['training']['dropout_ratio']
 
-    embedding: nn.Embeding = \
+    embedding: nn.Embedding = \
         nn.Embedding(vocabulary.num_words, hidden_size).to(device)
     encoder: models.Encoder = \
         models.Encoder(hidden_size, embedding,
@@ -104,9 +111,9 @@ if __name__ == "__main__":
 
     encoder.load_state_dict(checkpoint["encoder"])
     decoder.load_state_dict(checkpoint["decoder"])
-    vocabulary.__dict__ = checkpoint["vocabulary"]
 
-    greedy_searcher: models.GreedySearchDecoder(encoder, decoder)
+    greedy_searcher: models.GreedySearchDecoder =\
+        models.GreedySearchDecoder(encoder, decoder)
     encoder.eval()
     decoder.eval()
     greedy_searcher.eval()
@@ -114,6 +121,7 @@ if __name__ == "__main__":
     chat(
         greedy_searcher=greedy_searcher,
         vocabulary=vocabulary,
-        max_length=config["data"]["maxlen"],
+        max_length=config["vocabulary"]["max_length"],
+        sos_token=config["vocabulary"]["sos_token"],
         device=device
     )
