@@ -370,7 +370,6 @@ if __name__ == "__main__":
     # ``batch2TrainData`` simply takes a bunch of pairs and returns the input
     # and target tensors using the aforementioned functions.
     #
-    """
     def indexesFromSentence(voc, sentence):
         return [voc.word2index[word] for word in sentence.split(' ')] + [EOS_token]
 
@@ -1235,4 +1234,3 @@ if __name__ == "__main__":
 
     # Begin chatting (uncomment and run the following line to begin)
     #
-    """

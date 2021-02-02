@@ -51,6 +51,7 @@ class Vocabulary:
         self.index2word: dict = {}
 
         self.reset()
+        self.add_pairs()
         self.filter_all_pairs()
         self.add_pairs()
         self.trim_rare_words()
@@ -60,7 +61,8 @@ class Vocabulary:
         Reset vocabulary to initial state.
         """
         self.num_words = 3
-        self.word2index = self.word2count = {}
+        self.word2index = {}
+        self.word2count = {}
         self.index2word = {
             self.config["vocabulary"]["pad_token"]: "PAD",
             self.config["vocabulary"]["sos_token"]: "SOS",

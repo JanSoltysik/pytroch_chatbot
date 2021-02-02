@@ -157,7 +157,7 @@ class Attention(nn.Module):
             Calculated attention.
         """
         energy: torch.Tensor = self.attention(
-            torch.cat((hidden.expand(encoder_out.size(0), -1, -1), encoder_out, 2)).tanh()
+            torch.cat((hidden.expand(encoder_out.size(0), -1, -1), encoder_out), 2).tanh()
         )
         return torch.sum(self.v * energy, dim=2)
 

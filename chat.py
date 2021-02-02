@@ -15,7 +15,7 @@ from utils.preprocessing import basic_preprocessing
 
 
 def evaluate(greedy_searcher: models.GreedySearchDecoder,
-             vocabulary: Vocabulary,
+             vocabulary: 'Vocabulary',
              sentence: str,
              max_length: int,
              sos_token: int,
@@ -43,6 +43,7 @@ def evaluate(greedy_searcher: models.GreedySearchDecoder,
         Most probable following sentence after passed one.
     """
     index_batch: List[List[int]] = [vocabulary.index_from_sentence(sentence)]
+    print(index_batch)
     lengths: torch.Tensor =\
         torch.Tensor([len(index) for index in index_batch]).to(device)
     input_batch = torch.LongTensor(index_batch).transpose(0, 1).to(device)
@@ -51,7 +52,7 @@ def evaluate(greedy_searcher: models.GreedySearchDecoder,
 
 
 def chat(greedy_searcher: models.GreedySearchDecoder,
-         vocabulary: Vocabulary,
+         vocabulary: 'Vocabulary',
          max_length: int,
          sos_token: int,
          device: torch.device) -> None:
@@ -89,8 +90,8 @@ if __name__ == "__main__":
     except FileNotFoundError as e:
         print(f"Train model before chatting!")
 
-    vocabulary: 'Vocabulary' = Vocabulary("", [])
-    vocabulary.__dict__ = checkpoint["vocabulary"]
+    vocabulary: 'Vocabulary' = Vocabulary([], config)
+    ocabulary.__dict__ = checkpoint["vocabulary"]
 
     device: torch.device =\
         torch.device('cuda' if torch.cuda.is_available() else 'cpu')
