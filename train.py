@@ -194,7 +194,8 @@ def train(vocabulary: 'Vocabulary',
     start_epoch: int = 1
     if continue_training:
         checkpoint: dict = torch.load(
-            os.path.join(config["data"]["save_dir"], "model.tar")
+            os.path.join(config["data"]["save_dir"], "model.tar"),
+            map_location=device
         )
         encoder.load_state_dict(checkpoint["encoder"])
         decoder.load_state_dict(checkpoint["decoder"])

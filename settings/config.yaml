@@ -23,12 +23,12 @@ training:
   teacher_forcing_ratio: 1.0
   batch_size: 128
   hidden_size: 500
-  attention_method: "dot"
+  attention_method: "general"
   encoder_gru_layers: 2
   decoder_gru_layers: 2
   dropout_ratio: 0.1
   log_freq: 1
-  save_freq: 100
+  save_freq: 500
 
 
 

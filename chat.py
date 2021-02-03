@@ -43,7 +43,6 @@ def evaluate(greedy_searcher: models.GreedySearchDecoder,
         Most probable following sentence after passed one.
     """
     index_batch: List[List[int]] = [vocabulary.index_from_sentence(sentence)]
-    print(index_batch)
     lengths: torch.Tensor =\
         torch.Tensor([len(index) for index in index_batch]).to(device)
     input_batch = torch.LongTensor(index_batch).transpose(0, 1).to(device)
@@ -70,7 +69,7 @@ def chat(greedy_searcher: models.GreedySearchDecoder,
                 device=device
             )
             out = [word for word in out
-                    if word != "EOS" and word != "PAD"]
+                    if not(word == "EOS" or word == "PAD" or word == '.')]
             print(f"Bot: {' '.join(out)}")
         except KeyError:
             print("Word not known.")
@@ -83,18 +82,19 @@ if __name__ == "__main__":
         except yaml.YAMLError as e:
             print(f"Error during config load: {str(e)}")
 
+    device: torch.device = \
+        torch.device('cpu')
     try:
         checkpoint: dict = torch.load(
-                os.path.join(config["data"]["save_dir"], "model.tar")
+                os.path.join(config["data"]["save_dir"], "model.tar"),
+                map_location=device
         )
     except FileNotFoundError as e:
         print(f"Train model before chatting!")
 
     vocabulary: 'Vocabulary' = Vocabulary([], config)
-    ocabulary.__dict__ = checkpoint["vocabulary"]
+    vocabulary.__dict__ = checkpoint["vocabulary"]
 
-    device: torch.device =\
-        torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     hidden_size: int = config['training']['hidden_size']
     dropout_ratio: float = config['training']['dropout_ratio']
 
